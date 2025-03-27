@@ -1,12 +1,18 @@
+# EKS Setup with Amazon EBS CSI Driver and SonarQube
 
-Prerequisites:
-You should be ready with EKS cluster and node
+## Prerequisites
 
-Steps:
+Ensure you have an **EKS cluster** and **worker nodes** set up before proceeding.
 
-1.	Create IAM Policy for EBS:
-Policy details: Amazon_EBS_CSI_Driver
+## Steps
 
+### 1. Create IAM Policy for Amazon EBS
+
+Create an IAM policy with the following details:
+
+#### **Amazon\_EBS\_CSI\_Driver**
+
+```json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -30,39 +36,58 @@ Policy details: Amazon_EBS_CSI_Driver
     }
   ]
 }
+```
 
-2.	Get the IAM role Worker Nodes using and Associate this policy to that role
-you can get the role using below command
+### 2. Attach Policy to Worker Nodes IAM Role
 
+Retrieve the IAM role for worker nodes:
+
+```sh
 kubectl -n kube-system describe configmap aws-auth
+```
 
-o/p be like :  rolearn: arn:aws:iam::180789647333:role/eksctl-eksdemo1-nodegroup-eksdemo-NodeInstanceRole-IJN07ZKXAWNN
+Sample output:
 
-you can attached the above policy to highlighted role
+```
+rolearn: arn:aws:iam::180789647333:role/eksctl-eksdemo1-nodegroup-eksdemo-NodeInstanceRole-IJN07ZKXAWNN
+```
 
+Attach the **Amazon\_EBS\_CSI\_Driver** policy to the extracted role.
 
-3.	Deploy Amazon EBS CSI Driver
-You can install the EBS CSI Driver using below command
+### 3. Deploy Amazon EBS CSI Driver
 
-kustomize build "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.41" | kubectl apply -f –
+Install the EBS CSI Driver using:
 
-Verify ebs-csi pods running
+```sh
+kustomize build "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.41" | kubectl apply -f -
+```
+
+Verify that the EBS CSI pods are running:
+
+```sh
 kubectl get pods -n kube-system
+```
 
+### 4. Deploy Storage Class, Persistent Volume, PostgreSQL, and SonarQube
 
-4.	Below are the manifest file for Storage class, Persistent Volume, Postgress db and Sonarqube
+#### **Storage Class**
 
-storage-class.yml
+``
 
+```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
-metadata: 
+metadata:
   name: ebs-sc
 provisioner: ebs.csi.aws.com
 volumeBindingMode: WaitForFirstConsumer
+```
 
-persistent-volume-claim.yml
+#### **Persistent Volume Claim**
 
+``
+
+```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -75,9 +100,13 @@ spec:
   resources:
     requests:
       storage: 4Gi
+```
 
-postgress.yaml
+#### **PostgreSQL Deployment**
 
+``
+
+```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -87,9 +116,7 @@ data:
   POSTGRES_DB: sonarqube
   POSTGRES_USER: sonar
   POSTGRES_PASSWORD: sonarpassword
-
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -122,7 +149,6 @@ spec:
           persistentVolumeClaim:
             claimName: postgres-pv-claim
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -135,11 +161,13 @@ spec:
   selector:
     app: postgres
   type: ClusterIP
+```
 
+#### **SonarQube Deployment**
 
-sonar.yaml
+``
 
-
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -168,7 +196,6 @@ spec:
           ports:
             - containerPort: 9000
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -182,4 +209,10 @@ spec:
     - protocol: TCP
       port: 9000
       targetPort: 9000
-      nodePort: 32085		
+      nodePort: 32085
+```
+
+## Conclusion
+
+You have now set up Amazon EBS CSI Driver and deployed PostgreSQL and SonarQube on your **EKS cluster**. 🎉
+
